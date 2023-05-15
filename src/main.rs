@@ -22,6 +22,9 @@ struct Opt {
 
     #[structopt(short, long, help = "Generate the same teid with same gnb souce")]
     same: bool,
+
+    #[structopt(short, long, value_name = "TEID", help = "Teid value")]
+    teid: Option<u32>,
 }
 
 fn main() -> std::io::Result<()> {
@@ -46,10 +49,24 @@ fn main() -> std::io::Result<()> {
     res[6] = 0xAA;
     res[7] = 0xAA;
 
+    match opt.teid {
+        Some(t) => {
+            let mut teid: Vec<u8> = Vec::new();
+            teid.append(&mut t.to_be_bytes().to_vec());
+            res[4] = teid[0];
+            res[5] = teid[1];
+            res[6] = teid[2];
+            res[7] = teid[3];
+        }
+        None => {
+            println!("teid value is 0xAA 0xAA 0xAA 0xAA");
+        }
+    }
+
     match opt.count {
         Some(c) => message_count = c,
         None => {
-            eprintln!("error: --count is required");
+            println!("error: --count is required");
             std::process::exit(1);
         }
     }
@@ -62,10 +79,10 @@ fn main() -> std::io::Result<()> {
     }
 
     if opt.random {
-        let mut source: Vec<u8> = vec![127, 0, 0, 3]; // we cant take random ip, we need s.point
+        let mut source: Vec<u8> = vec![127, 0, 0, 4]; // we cant take random ip, we need s.point
 
         for i in 0..message_count {
-            if (source[3] == 255) {
+            if source[3] == 255 {
                 std::process::exit(1);
             }
             let mut ip_string: String = source
@@ -73,6 +90,7 @@ fn main() -> std::io::Result<()> {
                 .map(|x| x.to_string())
                 .collect::<Vec<String>>()
                 .join(".");
+            dbg!(&ip_string);
             ip_string.push_str(":2152");
             let socket = UdpSocket::bind(ip_string).expect("error while bind");
             let _ = socket.send_to(&res, "127.0.0.1:2152");
